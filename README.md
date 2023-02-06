@@ -1,3 +1,4 @@
-# Symbol Art Render (WIP)
+# Symbol Art Rendering Example
 
-- React Component for rendering Symbol Arts provided JSON Input.
+- An example of rendering a Symbol Art (`.sar`) provided JSON Input (parsed), written with PixiJS v7
+- Utilizes [`symbol-art-parser`](https://github.com/logue/symbol-art-parser) package by `@logue`.

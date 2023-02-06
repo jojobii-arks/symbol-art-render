@@ -1,31 +1,55 @@
-import {Application, Assets, Container, ITypedArray, SimplePlane, Texture} from 'pixi.js';
-import type SymbolArtInterface from 'symbol-art-parser/dist/interfaces/SymbolArtInterface';
+import {
+  Application,
+  Assets,
+  Container,
+  ITypedArray,
+  SimplePlane,
+} from "pixi.js";
+import type SymbolArtInterface from "symbol-art-parser/dist/interfaces/SymbolArtInterface";
 
-function colorToHex(color: number) {
-  const hexadecimal = color.toString(16);
-  return hexadecimal.length === 1 ? '0' + hexadecimal : hexadecimal;
+/** Turn RGB value into Hexadecimal format for `Mesh.tint` value */
+function convertRGBtoHex(red: number, green: number, blue: number) {
+  function colorToHex(color: number) {
+    const hexadecimal = color.toString(16);
+    return hexadecimal.length === 1 ? "0" + hexadecimal : hexadecimal;
+  }
+  return parseInt(
+    "0x" + colorToHex(red) + colorToHex(green) + colorToHex(blue)
+  );
 }
 
-function convertRGBtoHex(red:number, green: number, blue: number) {
-  return parseInt('0x' + colorToHex(red) + colorToHex(green) + colorToHex(blue));
-}
+/**
+ * Use PixiJS to render a Symbol Art provided the `.sar` data as JSON.
+ * @param sar - Symbol Art to render.
+ * @param resolution - Rendering multiplier. Base resolution is `190px by 95px`. Defaults to `4`
+ * @returns DataURL of the rendered Symbol Art.
+ */
+export default async function renderSar(
+  sar: SymbolArtInterface,
+  resolution: number = 4
+) {
+  const spritesheet = await Assets.load("/spritesheet.json");
 
-export default async function renderSar(sar: SymbolArtInterface) {
-  const spritesheet = await Assets.load('/spritesheet.json')
+  /** Top level container for rendering Symbol Art */
   const app = new Application({
-    width: 760,
-    height: 380,
+    width: 190 * resolution,
+    height: 95 * resolution,
     antialias: true,
     preserveDrawingBuffer: true,
     autoDensity: true,
     backgroundAlpha: 0,
-    clearBeforeRender: true
+    clearBeforeRender: true,
   });
-  const resolution = 4;
+
+  /** Rendering container for Symbol Art nested within `app` */
   const container = new Container();
   app.stage.addChild(container);
-  const offsetX = -126;
-  const offsetY = -317;
+
+  // Add offsets to recenter symbol when calculating corners (eyeball estimate).
+  const offsetX = -31.5 * resolution;
+  const offsetY = -79.25 * resolution;
+
+  // Reverse layers to render from back to front.
   const layers = sar.layers.reverse();
 
   for (let i = 0; i < layers.length; i++) {
@@ -34,19 +58,19 @@ export default async function renderSar(sar: SymbolArtInterface) {
     const corners = [
       {
         x: layer.position.topLeft.x * resolution + offsetX,
-        y: layer.position.topLeft.y * resolution + offsetY
+        y: layer.position.topLeft.y * resolution + offsetY,
       },
       {
         x: layer.position.topRight.x * resolution + offsetX,
-        y: layer.position.topRight.y * resolution + offsetY
+        y: layer.position.topRight.y * resolution + offsetY,
       },
       {
         x: layer.position.bottomLeft.x * resolution + offsetX,
-        y: layer.position.bottomLeft.y * resolution + offsetY
+        y: layer.position.bottomLeft.y * resolution + offsetY,
       },
       {
         x: layer.position.bottomRight.x * resolution + offsetX,
-        y: layer.position.bottomRight.y * resolution + offsetY
+        y: layer.position.bottomRight.y * resolution + offsetY,
       },
     ];
     const { r, g, b, a, isVisible } = layer;
@@ -59,103 +83,32 @@ export default async function renderSar(sar: SymbolArtInterface) {
     const trueB = b * 4;
 
     const hex = convertRGBtoHex(trueR, trueG, trueB);
-    console.log(corners.map(e => [e.x, e.y]).flat());
 
-    console.log(spritesheet.textures[layerPath]);
     const sprite = new SimplePlane(spritesheet.textures[layerPath], 2, 2);
     sprite.tint = hex;
     sprite.alpha = trueAlpha;
-    const buffer = sprite.geometry.getBuffer('aVertexPosition');
-    buffer.data = corners.map(e => [e.x, e.y]).flat() as unknown as ITypedArray;
+    const buffer = sprite.geometry.getBuffer("aVertexPosition");
+    buffer.data = corners
+      .map((e) => [e.x, e.y])
+      .flat() as unknown as ITypedArray;
     container.addChild(sprite);
   }
-  if (app.view.toDataURL) (console.log(app.view.toDataURL()))
 
- await new Promise(resolve => {
-    app.renderer.addListener('postrender', () => {
-      console.log(app.view.toDataURL());
+  // Wait for render to finish, then return the result.
+  const result = await new Promise((resolve, reject) => {
+    app.renderer.addListener("postrender", () => {
       if (app.view.toDataURL) {
-        resolve(app.view.toDataURL());
+        const x = app.view.toDataURL();
+        resolve(x);
+        app.destroy();
+      } else {
+        resolve(null);
       }
-      else return;
-    })
-  })
-
+    });
+  });
+  if (result === null)
+    throw Error(
+      "Something went wrong when attempting to render the Symbol Art..."
+    );
+  return result as string;
 }
-
-// export default function renderSar(sar: SymbolArt) {
-// 	const promise = new Promise(resolve => {
-// 		PIXI.utils.destroyTextureCache();
-// 		const app = new PIXI.Application({
-// 			width: 760,
-// 			height: 380,
-// 			antialias: true,
-// 			preserveDrawingBuffer: true,
-// 			autoDensity: true,
-// 			backgroundAlpha: 0,
-// 			clearBeforeRender: true
-// 		});
-
-// 		const resolution = 4;
-
-// 		app.loader.add('spritesheet', '../spritesheet.json').load(() => {
-// 			const container = new PIXI.Container();
-// 			app.stage.addChild(container);
-
-// 			const spritesheet = app.loader.resources.spritesheet;
-
-// 			const layers = [...sar.layers].reverse();
-
-// 			const offsetX = -126;
-// 			const offsetY = -317;
-
-// 			for (let i = 0; i < layers.length; i++) {
-// 				const layer = layers[i];
-// 				const layerPath = `${layer.props.textureIndex + 1}.png`;
-// 				const corners = [
-// 					{
-// 						x: layer.points.topLeft.x * resolution + offsetX,
-// 						y: layer.points.topLeft.y * resolution + offsetY
-// 					},
-// 					{
-// 						x: layer.points.topRight.x * resolution + offsetX,
-// 						y: layer.points.topRight.y * resolution + offsetY
-// 					},
-// 					{
-// 						x: layer.points.bottomRight.x * resolution + offsetX,
-// 						y: layer.points.bottomRight.y * resolution + offsetY
-// 					},
-// 					{
-// 						x: layer.points.bottomLeft.x * resolution + offsetX,
-// 						y: layer.points.bottomLeft.y * resolution + offsetY
-// 					}
-// 				];
-// 				const { props } = layer;
-// 				const { colorR, colorG, colorB, transparency, visible } = props;
-
-// 				let trueAlpha = transparency / 7;
-// 				if (!visible) trueAlpha = 0;
-
-// 				const trueR = colorR * 4;
-// 				const trueG = colorG * 4;
-// 				const trueB = colorB * 4;
-
-// 				const hex = convertRGBtoHex(trueR, trueG, trueB);
-
-// 				const sprite = new Sprite2d(spritesheet.textures[layerPath]);
-// 				sprite.anchor.set(0.5);
-// 				sprite.tint = hex;
-// 				sprite.alpha = trueAlpha;
-// 				sprite.proj.mapSprite(sprite, corners);
-
-// 				container.addChild(sprite);
-// 			}
-// 			app.renderer.addListener('postrender', () => {
-// 				resolve(app.view.toDataURL());
-// 				app.destroy();
-// 			});
-// 		});
-// 	});
-
-// 	return promise;
-// }
