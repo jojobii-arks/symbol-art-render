@@ -28,7 +28,7 @@ export default async function renderSar(
   sar: SymbolArtInterface,
   resolution: number = 4
 ) {
-  const spritesheet = await Assets.load("/spritesheet.json");
+  const spritesheet = await Assets.load("spritesheet.json");
 
   /** Top level container for rendering Symbol Art */
   const app = new Application({
